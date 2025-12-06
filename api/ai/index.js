@@ -20,12 +20,16 @@ export default async function handler(req, res) {
       ]
     });
 
-    const reply = response.output[0].content[0].text;
+    console.log("FULL RESPONSE:", JSON.stringify(response, null, 2));
+
+    const reply =
+      response.output?.[0]?.content?.[0]?.text ||
+      "ERROR: Unexpected OpenAI response format";
 
     return res.status(200).json({ reply });
 
   } catch (error) {
     console.error("API Error:", error);
-    return res.status(500).json({ error: "Internal Server Error" });
+    return res.status(500).json({ error: error.message });
   }
 }

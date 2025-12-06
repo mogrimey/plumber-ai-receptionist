@@ -1,26 +1,26 @@
 import OpenAI from "openai";
 
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method not allowed" });
+    return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   try {
     const { message } = req.body;
 
-    const client = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
-
-    const completion = await client.chat.completions.create({
+    const response = await client.responses.create({
       model: "gpt-4o-mini",
-      messages: [
+      input: [
         { role: "system", content: "You are an AI receptionist for a plumbing business." },
         { role: "user", content: message }
       ]
     });
 
-    const reply = completion.choices[0].message.content;
+    const reply = response.output[0].content[0].text;
 
     return res.status(200).json({ reply });
 
@@ -29,4 +29,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: "Internal Server Error" });
   }
 }
-

@@ -10,24 +10,25 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { message } = req.body;
+    const message = req.body.message || "Hello";
 
+    // Call OpenAI chat completion
     const completion = await client.chat.completions.create({
-  model: "gpt-4o-mini",
-  messages: [
-    {
-      role: "user",
-      content: req.body.message || "Hello"
-    }
-  ]
-});
+      model: "gpt-4o-mini",
+      messages: [
+        {
+          role: "user",
+          content: message,
+        },
+      ],
+    });
 
-
-    console.log("FULL RESPONSE:", JSON.stringify(response, null, 2));
-
+    // Extract assistant reply
     const reply =
-      response.output?.[0]?.content?.[0]?.text ||
-      "ERROR: Unexpected OpenAI response format";
+      completion.choices?.[0]?.message?.content ||
+      "Sorry, I couldn't generate a response.";
+
+    console.log("AI REPLY:", reply);
 
     return res.status(200).json({ reply });
 

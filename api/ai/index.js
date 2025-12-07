@@ -12,13 +12,16 @@ export default async function handler(req, res) {
   try {
     const { message } = req.body;
 
-    const response = await client.responses.create({
-      model: "gpt-4o-mini",
-      input: [
-        { role: "system", content: "You are an AI receptionist for a plumbing business." },
-        { role: "user", content: message }
-      ]
-    });
+    const completion = await client.chat.completions.create({
+  model: "gpt-4o-mini",
+  messages: [
+    {
+      role: "user",
+      content: req.body.message || "Hello"
+    }
+  ]
+});
+
 
     console.log("FULL RESPONSE:", JSON.stringify(response, null, 2));
 

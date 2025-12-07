@@ -17,6 +17,8 @@ export default async function handler(req, res) {
   }
 
   try {
+    console.log("INCOMING BODY:", req.body);
+
     // Normalize message to ALWAYS be a string
     let rawMessage = req.body?.message;
 

@@ -6,7 +6,7 @@ export async function POST(req) {
 
     const contactId = body.id; // matches your webhook body
     const fromNumber = "+19706496635"; // your plumbing number
-    const locationId = "YmyNRWyTceG1JbtLzvs7"; // set manually
+    const locationId = "YmyNRWyTceG1JbtLzvs7"; // your location ID
 
     if (!contactId) {
       return Response.json({ error: "Missing contactId" }, { status: 400 });
@@ -28,20 +28,17 @@ export async function POST(req) {
     );
 
     const msgData = await msgResponse.json();
-
     const lastMessage = msgData?.messages?.[0]?.message || "";
-
-    // Safety fallback
     const userMessage = lastMessage || "Hello";
 
     // --------------------------------------------
-    // 2. GENERATE AI REPLY
+    // 2. GENERATE AI REPLY WITH OPENAI
     // --------------------------------------------
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const fullPrompt = `
 You are the texting receptionist for a small local plumbing company called Aspen Plumbing.
-You sound like a real human, not a bot. NEVER admit you're AI.
+You sound like a real human, not a bot. NEVER reveal or hint that you're AI.
 
 Tone: warm, friendly, short messages.
 Reply naturally to the customer's text.
@@ -62,23 +59,22 @@ Customer message:
     const replyText = aiResponse.choices[0].message.content.trim();
 
     // --------------------------------------------
-    // 3. SEND SMS BACK THROUGH GHL
+    // 3. SEND SMS BACK THROUGH GHL (Legacy API v1)
     // --------------------------------------------
     const ghlResponse = await fetch(
-      "https://services.leadconnectorhq.com/conversations/messages",
+      "https://rest.gohighlevel.com/v1/messages/",
       {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${process.env.GHL_API_KEY}`,
-          "Version": "2021-07-28",
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          locationId,
-          contactId,
+          contactId: contactId,
+          locationId: locationId,
           type: "SMS",
           message: replyText,
-          from: fromNumber
+          fromNumber: fromNumber
         })
       }
     );

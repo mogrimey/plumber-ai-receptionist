@@ -4,28 +4,50 @@ export async function POST(req) {
   try {
     const body = await req.json();
 
-    const userMessage = body.message || "";
-    const contactId = body.contactId;   // FIXED
-    const locationId = body.locationId || "YmyNRWyTceG1JbtLzvs7";  
-    const fromNumber = "+19706496635";
+    const contactId = body.id; // matches your webhook body
+    const fromNumber = "+19706496635"; // your plumbing number
+    const locationId = "YmyNRWyTceG1JbtLzvs7"; // set manually
 
     if (!contactId) {
       return Response.json({ error: "Missing contactId" }, { status: 400 });
     }
 
-    // 1. Generate AI reply
+    // --------------------------------------------
+    // 1. FETCH LAST INBOUND SMS FROM THIS CONTACT
+    // --------------------------------------------
+    const msgResponse = await fetch(
+      `https://services.leadconnectorhq.com/conversations/messages/?contactId=${contactId}&limit=1`,
+      {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${process.env.GHL_API_KEY}`,
+          "Version": "2021-07-28",
+          "Content-Type": "application/json"
+        }
+      }
+    );
+
+    const msgData = await msgResponse.json();
+
+    const lastMessage = msgData?.messages?.[0]?.message || "";
+
+    // Safety fallback
+    const userMessage = lastMessage || "Hello";
+
+    // --------------------------------------------
+    // 2. GENERATE AI REPLY
+    // --------------------------------------------
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const fullPrompt = `
 You are the texting receptionist for a small local plumbing company called Aspen Plumbing.
-You sound like a real human, not a bot. You NEVER say you're AI.
+You sound like a real human, not a bot. NEVER admit you're AI.
 
-Tone: friendly, conversational, warm, calm. Keep messages short.
+Tone: warm, friendly, short messages.
+Reply naturally to the customer's text.
 
-Incoming customer message:
+Customer message:
 "${userMessage}"
-
-Respond as the AI texting receptionist.
     `;
 
     const aiResponse = await client.chat.completions.create({
@@ -39,7 +61,9 @@ Respond as the AI texting receptionist.
 
     const replyText = aiResponse.choices[0].message.content.trim();
 
-    // 2. Send SMS through GHL
+    // --------------------------------------------
+    // 3. SEND SMS BACK THROUGH GHL
+    // --------------------------------------------
     const ghlResponse = await fetch(
       "https://services.leadconnectorhq.com/conversations/messages",
       {
@@ -50,8 +74,8 @@ Respond as the AI texting receptionist.
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
-          locationId: locationId,
-          contactId: contactId,
+          locationId,
+          contactId,
           type: "SMS",
           message: replyText,
           from: fromNumber
@@ -63,6 +87,7 @@ Respond as the AI texting receptionist.
 
     return Response.json({
       success: true,
+      received: userMessage,
       reply: replyText,
       ghl: ghlData
     });

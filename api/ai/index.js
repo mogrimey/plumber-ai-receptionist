@@ -1,53 +1,77 @@
 import OpenAI from "openai";
 
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Ensure JSON body parsing
-export const config = {
-  api: {
-    bodyParser: true,
-  },
-};
-
-export default async function handler(req, res) {
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
-
+export async function POST(req) {
   try {
-    console.log("INCOMING BODY:", req.body);
+    const body = await req.json();
 
-    // Normalize message to ALWAYS be a string
-    let rawMessage = req.body?.message;
+    const userMessage = body.message || "";
+    const contactId = body.id;
+    const locationId = "YmyNRWyTceG1JbtLzvs7"; // Your GHL location
+    const fromNumber = "+19706496635"; // Your plumbing number
 
-    // Convert arrays or objects into a readable string
-    let message =
-      typeof rawMessage === "string"
-        ? rawMessage
-        : JSON.stringify(rawMessage);
+    if (!contactId) {
+      return Response.json({ error: "Missing contactId" }, { status: 400 });
+    }
 
-    if (!message) message = "Hello";
+    // 1. Generate AI reply using your plumbing prompt
+    const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-    // Call OpenAI
-    const completion = await client.chat.completions.create({
+    const fullPrompt = `
+You are the texting receptionist for a small local plumbing company called Aspen Plumbing.
+You sound like a real human, not a bot. You NEVER say you're AI.
+
+Tone: friendly, conversational, warm, calm. Keep messages short.
+
+Incoming customer message:
+"${userMessage}"
+
+Respond as the AI texting receptionist.
+    `;
+
+    const aiResponse = await client.chat.completions.create({
       model: "gpt-4o-mini",
       messages: [
-        {
-          role: "user",
-          content: message, // ALWAYS a string now
-        },
+        { role: "system", content: fullPrompt },
+        { role: "user", content: userMessage }
       ],
+      max_tokens: 120,
     });
 
-    const reply =
-      completion.choices?.[0]?.message?.content ||
-      "Sorry, I couldn't generate a response.";
+    const replyText = aiResponse.choices[0].message.content.trim();
 
-    return res.status(200).json({ reply });
-  } catch (error) {
-    console.error("API Error:", error);
-    return res.status(500).json({ error: error.message });
+    // 2. Send the reply back through GHL SMS API
+    const ghlResponse = await fetch(
+      "https://services.leadconnectorhq.com/conversations/messages",
+      {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${process.env.GHL_API_KEY}`,
+          "Version": "2021-07-28",
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          locationId: locationId,
+          contactId: contactId,
+          type: "SMS",
+          message: replyText,
+          from: fromNumber
+        })
+      }
+    );
+
+    const ghlData = await ghlResponse.json();
+
+    return Response.json({
+      success: true,
+      reply: replyText,
+      ghl: ghlData
+    });
+
+  } catch (err) {
+    console.error(err);
+    return Response.json(
+      { error: "Server error", details: err.message },
+      { status: 500 }
+    );
   }
 }

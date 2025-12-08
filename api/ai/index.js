@@ -5,15 +5,15 @@ export async function POST(req) {
     const body = await req.json();
 
     const userMessage = body.message || "";
-    const contactId = body.id;
-    const locationId = "YmyNRWyTceG1JbtLzvs7"; // Your GHL location
-    const fromNumber = "+19706496635"; // Your plumbing number
+    const contactId = body.contactId;   // FIXED
+    const locationId = body.locationId || "YmyNRWyTceG1JbtLzvs7";  
+    const fromNumber = "+19706496635";
 
     if (!contactId) {
       return Response.json({ error: "Missing contactId" }, { status: 400 });
     }
 
-    // 1. Generate AI reply using your plumbing prompt
+    // 1. Generate AI reply
     const client = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const fullPrompt = `
@@ -39,7 +39,7 @@ Respond as the AI texting receptionist.
 
     const replyText = aiResponse.choices[0].message.content.trim();
 
-    // 2. Send the reply back through GHL SMS API
+    // 2. Send SMS through GHL
     const ghlResponse = await fetch(
       "https://services.leadconnectorhq.com/conversations/messages",
       {
